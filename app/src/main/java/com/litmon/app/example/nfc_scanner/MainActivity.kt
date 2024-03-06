@@ -31,8 +31,8 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (isScanning) {
-                    IsoDepScanCardEffect {
-                        Toast.makeText(this, "isoDep detected.", Toast.LENGTH_SHORT).show()
+                    IsoDepScanEffect(this@MainActivity) {
+                        Toast.makeText(this, "isoDep detected. $it", Toast.LENGTH_SHORT).show()
                     }
                 }
 
