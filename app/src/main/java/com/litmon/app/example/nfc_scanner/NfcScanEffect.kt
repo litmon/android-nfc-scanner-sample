@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.compose.LifecycleResumeEffect
 
 @Composable
 fun TagScanEffect(
@@ -43,10 +44,10 @@ fun <T : Any> NfcScanEffect(
     onScanned: (T) -> Unit,
 ) {
     val rememberedScanner = remember { scanner() }
-    DisposableEffect(rememberedScanner) {
+    LifecycleResumeEffect(rememberedScanner) {
         rememberedScanner.start(onScanned)
 
-        onDispose {
+        onPauseOrDispose {
             rememberedScanner.stop()
         }
     }
