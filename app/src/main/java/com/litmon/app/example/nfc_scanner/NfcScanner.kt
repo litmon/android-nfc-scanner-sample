@@ -67,7 +67,7 @@ internal class NfcScannerImpl<T : Any>(
     }
 
     private val lifecycleObserver = object : DefaultLifecycleObserver {
-        override fun onCreate(owner: LifecycleOwner) {
+        override fun onStart(owner: LifecycleOwner) {
             Timber.d("addOnNewIntentListener")
             activity.addOnNewIntentListener(onNewIntentListener)
         }
@@ -82,7 +82,7 @@ internal class NfcScannerImpl<T : Any>(
             nfcAdapter.disableForegroundDispatch(activity)
         }
 
-        override fun onDestroy(owner: LifecycleOwner) {
+        override fun onStop(owner: LifecycleOwner) {
             Timber.d("removeOnNewIntentListener")
             activity.removeOnNewIntentListener(onNewIntentListener)
         }
