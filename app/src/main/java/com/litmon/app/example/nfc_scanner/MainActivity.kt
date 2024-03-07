@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import com.litmon.app.example.nfc_scanner.ui.theme.NfcScannerTheme
 
 class MainActivity : AppCompatActivity() {
+    private val scanner by lazy { IsoDepScanner(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -31,7 +33,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (isScanning) {
-                    IsoDepScanEffect(this@MainActivity) {
+                    IsoDepScanEffect(scanner) {
                         Toast.makeText(this, "isoDep detected. $it", Toast.LENGTH_SHORT).show()
                     }
                 }

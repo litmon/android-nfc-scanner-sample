@@ -4,20 +4,20 @@ import android.nfc.Tag
 import android.nfc.tech.IsoDep
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.LifecycleOwner
 
 @Composable
 fun TagScanEffect(
-    activity: FragmentActivity,
+    scanner: TagScanner,
+    lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
     onTagDetected: (Tag) -> Unit,
 ) {
     val currentOnTagDetected = rememberUpdatedState(onTagDetected)
-    val lifecycleOwner = LocalLifecycleOwner.current
     NfcScanEffect(
-        scanner = { TagScanner(activity = activity, lifecycleOwner = lifecycleOwner) }
+        scanner = scanner,
+        lifecycleOwner = lifecycleOwner,
     ) {
         currentOnTagDetected.value(it)
     }
@@ -25,13 +25,14 @@ fun TagScanEffect(
 
 @Composable
 fun IsoDepScanEffect(
-    activity: FragmentActivity,
+    scanner: IsoDepScanner,
+    lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
     onIsoDepDetected: (IsoDep) -> Unit,
 ) {
     val currentOnIsoDepDetected = rememberUpdatedState(onIsoDepDetected)
-    val lifecycleOwner = LocalLifecycleOwner.current
     NfcScanEffect(
-        scanner = { IsoDepScanner(activity = activity, lifecycleOwner = lifecycleOwner) }
+        scanner = scanner,
+        lifecycleOwner = lifecycleOwner,
     ) {
         currentOnIsoDepDetected.value(it)
     }
@@ -39,15 +40,15 @@ fun IsoDepScanEffect(
 
 @Composable
 fun <T : Any> NfcScanEffect(
-    scanner: () -> NfcScanner<T>,
+    scanner: NfcScanner<T>,
+    lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
     onScanned: (T) -> Unit,
 ) {
-    val rememberedScanner = remember { scanner() }
-    DisposableEffect(rememberedScanner) {
-        rememberedScanner.start(onScanned)
+    DisposableEffect(scanner, lifecycleOwner) {
+        scanner.start(lifecycleOwner, onScanned)
 
         onDispose {
-            rememberedScanner.stop()
+            scanner.stop()
         }
     }
 }

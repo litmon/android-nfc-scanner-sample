@@ -14,22 +14,23 @@ import android.nfc.tech.NfcB
 import android.nfc.tech.NfcBarcode
 import android.nfc.tech.NfcF
 import android.nfc.tech.NfcV
+import androidx.activity.ComponentActivity
 import androidx.core.app.PendingIntentCompat
 import androidx.core.content.IntentCompat
 import androidx.core.util.Consumer
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import timber.log.Timber
 
-interface NfcScanner<T : Any> {
-    fun start(onScanned: (T) -> Unit)
+interface NfcScanner<T> {
+    fun start(lifecycleOwner: LifecycleOwner, onScanned: (T) -> Unit)
     fun stop()
 }
 
-internal class NfcScannerImpl<T : Any>(
-    private val activity: FragmentActivity,
-    private val lifecycleOwner: LifecycleOwner,
+internal class NfcScannerImpl<T>(
+    private val activity: ComponentActivity,
     private val filters: Array<IntentFilter>,
     private val techLists: Array<Array<String>>,
     private val tagConverter: (Tag) -> T?,
@@ -48,7 +49,9 @@ internal class NfcScannerImpl<T : Any>(
         true
     )
 
-    private var onScanned: (T) -> Unit = {}
+    private var lifecycleOwner: LifecycleOwner? = null
+
+    private var onScanned: ((T) -> Unit)? = null
 
     private val onNewIntentListener = Consumer<Intent> {
         Timber.d("newIntent received: $it")
@@ -62,43 +65,78 @@ internal class NfcScannerImpl<T : Any>(
 
         val converted = tag?.let(tagConverter)
         if (converted != null) {
-            onScanned(converted)
+            onScanned?.invoke(converted)
         }
     }
 
     private val lifecycleObserver = object : DefaultLifecycleObserver {
+        override fun onCreate(owner: LifecycleOwner) {
+            Timber.d("onCreate")
+            addOnNewIntentListener()
+        }
+
         override fun onStart(owner: LifecycleOwner) {
-            Timber.d("addOnNewIntentListener")
-            activity.addOnNewIntentListener(onNewIntentListener)
+            Timber.d("onStart")
         }
 
         override fun onResume(owner: LifecycleOwner) {
-            Timber.d("startScanning")
-            nfcAdapter.enableForegroundDispatch(activity, pendingIntent, filters, techLists)
+            Timber.d("onResume")
+            enableForegroundDispatch()
         }
 
         override fun onPause(owner: LifecycleOwner) {
-            Timber.d("stopScanning")
-            nfcAdapter.disableForegroundDispatch(activity)
+            Timber.d("onPause")
+            disableForegroundDispatch()
         }
 
         override fun onStop(owner: LifecycleOwner) {
-            Timber.d("removeOnNewIntentListener")
-            activity.removeOnNewIntentListener(onNewIntentListener)
+            Timber.d("onStop")
+        }
+
+        override fun onDestroy(owner: LifecycleOwner) {
+            Timber.d("onDestroy")
+            removeOnNewIntentListener()
         }
     }
 
-    override fun start(onScanned: (T) -> Unit) {
-        this.onScanned = onScanned
+    override fun start(lifecycleOwner: LifecycleOwner, onScanned: (T) -> Unit) {
         lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
+
+        this.onScanned = onScanned
+        this.lifecycleOwner = lifecycleOwner
     }
 
     override fun stop() {
-        this.onScanned = {}
-        lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
+        lifecycleOwner?.let { owner ->
+            owner.lifecycle.removeObserver(lifecycleObserver)
+            if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                disableForegroundDispatch()
+                removeOnNewIntentListener()
+            }
+        }
 
-        lifecycleObserver.onPause(lifecycleOwner)
-        lifecycleObserver.onDestroy(lifecycleOwner)
+        this.onScanned = null
+        this.lifecycleOwner = null
+    }
+
+    private fun addOnNewIntentListener() {
+        Timber.d("addOnNewIntentListener")
+        activity.addOnNewIntentListener(onNewIntentListener)
+    }
+
+    private fun removeOnNewIntentListener() {
+        Timber.d("removeOnNewIntentListener")
+        activity.removeOnNewIntentListener(onNewIntentListener)
+    }
+
+    private fun enableForegroundDispatch() {
+        Timber.d("startScanning")
+        nfcAdapter.enableForegroundDispatch(activity, pendingIntent, filters, techLists)
+    }
+
+    private fun disableForegroundDispatch() {
+        Timber.d("stopScanning")
+        nfcAdapter.disableForegroundDispatch(activity)
     }
 
     companion object {
@@ -108,10 +146,8 @@ internal class NfcScannerImpl<T : Any>(
 
 class TagScanner(
     activity: FragmentActivity,
-    lifecycleOwner: LifecycleOwner,
 ) : NfcScanner<Tag> by NfcScannerImpl(
     activity = activity,
-    lifecycleOwner = lifecycleOwner,
     filters = filters,
     techLists = techLists,
     tagConverter = { it },
@@ -138,10 +174,8 @@ class TagScanner(
 
 class IsoDepScanner(
     activity: FragmentActivity,
-    lifecycleOwner: LifecycleOwner,
 ) : NfcScanner<IsoDep> by NfcScannerImpl(
     activity = activity,
-    lifecycleOwner = lifecycleOwner,
     filters = filters,
     techLists = techLists,
     tagConverter = { IsoDep.get(it) },
